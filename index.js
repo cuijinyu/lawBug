@@ -108,6 +108,7 @@ function getGuid () {
 }
 
 async function getTreeList (guid, number, param, vl5x, index = 1) {
+    console.log(arguments);
     return new Promise ((resolve, reject) => {
         let headers = {
             "Accept":"*/*",
@@ -141,16 +142,27 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
             (async ()=> {
                 let proxy = await getProxy();
                 options['proxy'] = "http://" + proxy;
+                let flag = false;
+                let timeWatcher = setTimeout(() => {
+                    if (!flag) {
+                        return;
+                    }
+                }, 10000);
                 request(options, (err, res, body) => {
                     if (err) {
+                        console.log(err);
+                        clearTimeout(timeWatcher);
                         reject(err);
                     }
+                    console.log(body);
+                    clearTimeout(timeWatcher);
                     resolve(body);
                 })
             })()
         } else {
             request(options, (err, res, body) => {
                 if (err) {
+                    console.lot(err);
                     reject(err);
                 }
                 resolve(body);
@@ -170,26 +182,32 @@ function Navi (id) {
     return com.str.De(unzipid);
 }
 
-async function main () {
-    let contentList = [];
-    //获取进行请求所需要的一切参数
+async function setAllParams () {
     let cookie = await getCookie();
-    console.log(`设置Cookie为 -----> ${cookie}`);
-
     let vjkl5 = getvjkl5(cookie);
-    console.log(`设置vjkl5为 -----> ${vjkl5}`);
-
     let guid = getGuid();
     let number = await getNumber(guid);
-    console.log(`设置number为 -----> ${number}`);
-
     let vl5x = get_key(vjkl5);
+    console.log(`设置Cookie为 -----> ${cookie}`);
+    console.log(`设置vjkl5为 -----> ${vjkl5}`);
+    console.log(`设置number为 -----> ${number}`);
     console.log(`设置vl5x为 -----> ${vl5x}`);
-
     //查询所用的参数
     let param = `${config.search.param}`;
     console.log(`设置查询参数为 -----> ${config.search.param}`);
+    return {
+        cookie,
+        vjkl5,
+        guid,
+        number,
+        vl5x,
+        param
+    }
+}
 
+async function main () {
+    let contentList = [];
+    let searchObj = {};
     let result;
     console.log(`----------------------------------------> 开始获取列表`);
 
@@ -198,38 +216,40 @@ async function main () {
         console.log(`获取法院数据进度：${i / courtsData.length * 100} %`);
 
         try{
-            result = await getTreeList(guid, number, param, vl5x);
+            searchObj = await setAllParams();
+            searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
+            result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
             //如果获取时出现remind key则重新获取cookie
             while (result === '"remind key"') {
-                cookie = await getCookie();
-                console.log(`设置Cookie为 -----> ${cookie}`);
-
-                vjkl5 = getvjkl5(cookie);
-                vl5x = get_key(vjkl5);
-                console.log(`设置vl5x为 -----> ${vl5x}`);
-
-                result = await getTreeList(guid, number, param, vl5x);
+                console.log(`<<出现remind key>>`);
+                searchObj = await setAllParams();
+                searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
+                result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
             }
-            result = JSON.parse(eval(result));
-            contentList = [...contentList, ...result];
-            console.log(result);
+            try {
+                result = JSON.parse(eval(result));
+                contentList = [...contentList, ...result];
+                console.log(result);
+            } catch (e) {
+                console.log(`<<处理 <${courtsData[i]}> 法院数据时出现错误>>`)
+            }
         } catch(e) {
-            console.log(`<<出现remind key>>`);
-
-            result = await getTreeList(guid, number, param, vl5x);
+            result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
             //如果获取时出现remind key则重新获取cookie
             while (result === '"remind key"') {
-                cookie = await getCookie();
-                vjkl5 = getvjkl5(cookie);
-                vl5x = get_key(vjkl5);
-                result = await getTreeList(guid, number, param, vl5x);
+                searchObj = await setAllParams();
+                searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
+                result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
             }
-            result = JSON.parse(eval(result));
-            contentList = [...contentList, ...result];
-            console.log(result);
+            try {
+                result = JSON.parse(eval(result));
+                contentList = [...contentList, ...result];
+                console.log(result);
+            } catch (e) {
+                console.log(`<<处理 <${courtsData[i]}> 法院数据时出现错误>>`)
+            }
         }
     }
-    console.log(`结果为----->${result}`);
 
     console.log(`----------------------------------------> 开始获取文章内容`);
     for (let i = 0; i < contentList.length; i++) {
