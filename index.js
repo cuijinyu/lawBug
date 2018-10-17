@@ -242,7 +242,7 @@ async function main () {
     let result;
     logger.debug(`----------------------------------------> 开始获取列表`);
 
-    for (let i = 2369; i < courtsData.length; i ++) {
+    for (let i = 1; i < courtsData.length; i ++) {
         logger.debug("");
         logger.debug(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
         logger.debug(`获取法院数据进度：${i / courtsData.length * 100} %`);
