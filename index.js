@@ -5,7 +5,11 @@ const Dao = require('./db/dao');
 const De = require('./lib/de');
 const config = require('./config/config');
 const getKey = require('./lib/getKey');
+const log4js = require("log4js");
 const unzip = De.unzip;
+
+const logger = log4js.getLogger();
+// logger.level = 'debug';
 
 // 因为setTimeout被占用，故用setInterval来实现延时
 const sleep = (time, cb) => new Promise(resolve => {
@@ -28,10 +32,11 @@ function getCookie () {
     return new Promise( (resolve, reject) => {
         request.get("http://wenshu.court.gov.cn/list/list/?sorttype=1", (err, res, body) => {
             if (err) {
-                console.log(err);
+                logger.error(err);
+                // logger.debug(err);
                 reject(err);
             }
-            // console.log(res.headers["set-cookie"]);
+            // logger.debug(res.headers["set-cookie"]);
             resolve(res.headers["set-cookie"]);
         })  
     })
@@ -82,13 +87,20 @@ function getNumber (guid) {
 }
 
 function getProxy () {
+    let options = {
+        url:`${config.proxy.address}`,
+        method:"GET",
+        timeout:10000,
+    };
     return new Promise( (resolve, reject) => {
         //  代理IP
-        request(`${config.proxy.address}`, (err, res, body) => {
+        request(options, (err, res, body) => {
             if (err) {
+                logger.error("抱歉！代理服务器似乎挂了");
                 reject(err);
             }
-            console.log(`<!使用IP代理-------->${body}`);
+            logger.debug(`<!使用IP代理-------->${body}`);
+            // logger.debug(`<!使用IP代理-------->${body}`);
             resolve(body);
         })
     })
@@ -106,7 +118,8 @@ function getDoc (realId) {
                         reject(err);
                     }
                 } catch (e) {
-                    console.warn(e);
+                    logger.warn(e)
+                    // console.warn(e);
                 }
                 resolve(body);
             })
@@ -119,7 +132,7 @@ function getGuid () {
 }
 
 async function getTreeList (guid, number, param, vl5x, index = 1) {
-    console.log(arguments);
+    logger.debug(arguments);
     return new Promise ((resolve, reject) => {
         let headers = {
             "Accept":"*/*",
@@ -138,7 +151,7 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
             url:"http://wenshu.court.gov.cn/List/ListContent",
             method:"POST",
             headers,
-            timeout:1000,
+            timeout:10000,
             body:qs.stringify({
                 guid:guid,
                 number:number,
@@ -163,16 +176,16 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
                 try {
                     request(options, (err, res, body) => {
                         if (err) {
-                            console.log(err);
+                            logger.debug(err);
                             clearTimeout(timeWatcher);
                             reject(err);
                         }
-                        console.log(body);
+                        logger.debug(body);
                         clearTimeout(timeWatcher);
                         resolve(body);
                     })
                 } catch (e) {
-                    console.log("获取超时，正在进行重试");
+                    logger.error("获取超时，正在进行重试");
                     getTreeList(guid, number, param, vl5x, index);
                 }
             })()
@@ -186,12 +199,12 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
                     resolve(body);
                 })
             } catch (e) {
-                console.log("获取超时，正在进行重试");
+                logger.error("获取超时，正在进行重试");
                 getTreeList(guid, number, param, vl5x, index);
             }
         }
     }).catch(e => {
-        console.log("获取超时")
+        logger.debug("获取超时")
     })
 }
 
@@ -206,13 +219,13 @@ async function setAllParams () {
     let guid = getGuid();
     let number = await getNumber(guid);
     let vl5x = get_key(vjkl5);
-    console.log(`设置Cookie为 -----> ${cookie}`);
-    console.log(`设置vjkl5为 -----> ${vjkl5}`);
-    console.log(`设置number为 -----> ${number}`);
-    console.log(`设置vl5x为 -----> ${vl5x}`);
+    logger.debug(`设置Cookie为 -----> ${cookie}`);
+    logger.debug(`设置vjkl5为 -----> ${vjkl5}`);
+    logger.debug(`设置number为 -----> ${number}`);
+    logger.debug(`设置vl5x为 -----> ${vl5x}`);
     //查询所用的参数
     let param = `${config.search.param}`;
-    console.log(`设置查询参数为 -----> ${config.search.param}`);
+    logger.debug(`设置查询参数为 -----> ${config.search.param}`);
     return {
         cookie,
         vjkl5,
@@ -227,32 +240,32 @@ async function main () {
     let contentList = [];
     let searchObj = {};
     let result;
-    console.log(`----------------------------------------> 开始获取列表`);
+    logger.debug(`----------------------------------------> 开始获取列表`);
 
-    for (let i = 0; i < courtsData.length; i ++) {
-        console.log("");
-        console.log(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
-        console.log(`获取法院数据进度：${i / courtsData.length * 100} %`);
-        console.log(`正在查询的法院:所有的法院${i}/${courtsData.length}`);
-        console.log("");
+    for (let i = 2369; i < courtsData.length; i ++) {
+        logger.debug("");
+        logger.debug(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
+        logger.debug(`获取法院数据进度：${i / courtsData.length * 100} %`);
+        logger.debug(`正在查询的法院:所有的法院${i}/${courtsData.length}`);
+        logger.debug("");
         try{
             searchObj = await setAllParams();
             searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
             result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
-            Dao.insertListContent(result);
+            result = JSON.parse(eval(result));
+            result.forEach(element => {
+                Dao.insertListContent(element);
+            });
             //如果获取时出现remind key则重新获取cookie
             while (result === '"remind key"') {
-                console.log(`<<出现remind key>>`);
+                logger.debug(`<<出现remind key>>`);
                 searchObj = await setAllParams();
                 searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
                 result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
-            }
-            try {
                 result = JSON.parse(eval(result));
-                contentList = [...contentList, ...result];
-                console.log(result);
-            } catch (e) {
-                console.log(`<<处理 <${courtsData[i]}> 法院数据时出现错误>>`)
+                result.forEach(element => {
+                    Dao.insertListContent(element);
+                });
             }
         } catch(e) {
             result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
@@ -261,45 +274,47 @@ async function main () {
                 searchObj = await setAllParams();
                 searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
                 result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
-            }
-            try {
                 result = JSON.parse(eval(result));
-                contentList = [...contentList, ...result];
-                console.log(result);
-            } catch (e) {
-                console.log(`<<处理 <${courtsData[i]}> 法院数据时出现错误>>`)
+                result.forEach(element => {
+                    Dao.insertListContent(element);
+                });
             }
         }
     }
 
-    console.log(`----------------------------------------> 开始获取文章内容`);
-    for (let i = 0; i < contentList.length; i++) {
-        console.log(`获取文书数据进度：${i / courtsList.length * 100} %`)
-        if (contentList[i].hasOwnProperty('RunEval')) {
-            (() => {
-                //替换默认setTimeout，因为Node的setTimeout默认不能支持字符串
-                setTimeout = function (string) {
-                    eval(string);
-                }
-                eval(unzip(contentList[i]['RunEval']));
-            })()
-        } else {
-            try {
-                let realId = Navi(contentList[i]['文书ID']);
-            } catch (e) {
-                console.log(`<<为文书 <${contentList[i]['文书ID']}> 解密失败>>`);
-            }
-            try {
-                let doc = await getDoc(realId);
-            } catch (e) {
-                console.log(`<<获取文书 <${contentList[i]['文书ID']}> 详情失败>>`);
-            }
-        }
-    }
+    logger.debug(`----------------------------------------> 开始获取文章内容`);
+
+    //  获取所有的文书列表
+    let wenshuList = await Dao.getWenShuList();
+    //  暂未测试
+    
+    // for (let i = 0; i < contentList.length; i++) {
+    //     logger.debug(`获取文书数据进度：${i / courtsList.length * 100} %`)
+    //     if (contentList[i].hasOwnProperty('RunEval')) {
+    //         (() => {
+    //             //替换默认setTimeout，因为Node的setTimeout默认不能支持字符串
+    //             setTimeout = function (string) {
+    //                 eval(string);
+    //             }
+    //             eval(unzip(contentList[i]['RunEval']));
+    //         })()
+    //     } else {
+    //         try {
+    //             let realId = Navi(contentList[i]['文书ID']);
+    //         } catch (e) {
+    //             logger.error(`<<为文书 <${contentList[i]['文书ID']}> 解密失败>>`);
+    //         }
+    //         try {
+    //             let doc = await getDoc(realId);
+    //         } catch (e) {
+    //             logger.error(`<<获取文书 <${contentList[i]['文书ID']}> 详情失败>>`);
+    //         }
+    //     }
+    // }
 }
 
 try {
     main();
 } catch (e) {
-    console.log("连接超时");
+    logger.error(e);
 }
