@@ -1,10 +1,21 @@
 const request = require('request').defaults({jar: true});   //  使用全局cookie
 const fs = require('fs');
 const qs = require('qs');
+const Dao = require('./db/dao');
 const De = require('./lib/de');
 const config = require('./config/config');
 const getKey = require('./lib/getKey');
 const unzip = De.unzip;
+
+// 因为setTimeout被占用，故用setInterval来实现延时
+const sleep = (time, cb) => new Promise(resolve => {
+    let interval = setInterval(() => {
+      clearInterval(interval);
+      if (cb)
+      cb();
+      resolve();
+    }, time)
+});
 
 let com = {
     str:De.str
@@ -127,6 +138,7 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
             url:"http://wenshu.court.gov.cn/List/ListContent",
             method:"POST",
             headers,
+            timeout:1000,
             body:qs.stringify({
                 guid:guid,
                 number:number,
@@ -148,32 +160,38 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
                         return;
                     }
                 }, 10000);
-                request(options, (err, res, body) => {
-                    if (err) {
-                        console.log(err);
+                try {
+                    request(options, (err, res, body) => {
+                        if (err) {
+                            console.log(err);
+                            clearTimeout(timeWatcher);
+                            reject(err);
+                        }
+                        console.log(body);
                         clearTimeout(timeWatcher);
-                        reject(err);
-                    }
-                    console.log(body);
-                    clearTimeout(timeWatcher);
-                    resolve(body);
-                })
+                        resolve(body);
+                    })
+                } catch (e) {
+                    console.log("获取超时，正在进行重试");
+                    getTreeList(guid, number, param, vl5x, index);
+                }
             })()
         } else {
-            request(options, (err, res, body) => {
-                if (err) {
-                    console.lot(err);
-                    reject(err);
-                }
-                resolve(body);
-            })
+            try {
+                request(options, (err, res, body) => {
+                    if (err) {
+                        console.lot(err);
+                        reject(err);
+                    }
+                    resolve(body);
+                })
+            } catch (e) {
+                console.log("获取超时，正在进行重试");
+                getTreeList(guid, number, param, vl5x, index);
+            }
         }
-    })
-}
-
-const sleep = function (time) {
-    return new Promise(resolve => {
-        setTimeout(resolve(), time);
+    }).catch(e => {
+        console.log("获取超时")
     })
 }
 
@@ -212,13 +230,16 @@ async function main () {
     console.log(`----------------------------------------> 开始获取列表`);
 
     for (let i = 0; i < courtsData.length; i ++) {
+        console.log("");
         console.log(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
         console.log(`获取法院数据进度：${i / courtsData.length * 100} %`);
-
+        console.log(`正在查询的法院:所有的法院${i}/${courtsData.length}`);
+        console.log("");
         try{
             searchObj = await setAllParams();
             searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
             result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
+            Dao.insertListContent(result);
             //如果获取时出现remind key则重新获取cookie
             while (result === '"remind key"') {
                 console.log(`<<出现remind key>>`);
@@ -277,4 +298,8 @@ async function main () {
     }
 }
 
-main();
+try {
+    main();
+} catch (e) {
+    console.log("连接超时");
+}

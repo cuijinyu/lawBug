@@ -25,6 +25,8 @@
   "homepage": "https://github.com/cuijinyu/lawBug#readme",
   "dependencies": {
     "crypto-js": "^3.1.9-1",
+    "log4js": "^3.0.6",
+    "mysql": "^2.16.0",
     "qs": "^6.5.2",
     "request": "^2.88.0"
   }
