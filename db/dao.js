@@ -11,7 +11,7 @@ const pool = mysql.createPool({
   database:config.database.database
 })
 
-const Query=( sql , ...params )=>{
+const Query = ( sql , ...params )=>{
   return new Promise(function(resolve,reject){
       pool.getConnection(function(err,connection){
           if(err){
@@ -74,7 +74,7 @@ async function insertListContent(ListContent) {
  * @param {*} wenshu 文书的内容，还没有对其进行处理
  */
 async function insertWenShu(wenshu) {
-  logger.error("正在插入文书内容");
+  logger.debug("正在插入文书内容");
   return await Query('insert into WenshuData values(?)', wenshu);
 }
 
@@ -95,12 +95,22 @@ async function getAllWorkedWenShuList () {
 /**
  * 获取所有获取到的完整文书
  */
-async function getAllWenShu () {
-  return await Query('select * from WenshuData');
+async function getAllWenShu (limit1, limit2) {
+  return await Query(`select * from WenshuData where jsonData is not null and jsonData like "$(%" limit ${limit1},${limit2} `);
+}
+
+/**
+ * 对文书进行更新，主要是插入解析数据
+ */
+async function updateWenShu () {
+
 }
 
 module.exports = {
   insertListContent,
   insertWenShu,
-  getWenShuList
+  getWenShuList,
+  getAllWenShu,
+  updateWenShu,
+  getAllWorkedWenShuList
 }

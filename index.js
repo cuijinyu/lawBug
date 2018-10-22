@@ -6,6 +6,7 @@ const De = require('./lib/de');
 const config = require('./config/config');
 const getKey = require('./lib/getKey');
 const log4js = require("log4js");
+const Util = require("./util/getInfo");
 const unzip = De.unzip;
 
 const logger = log4js.getLogger();
@@ -110,16 +111,24 @@ function getDoc (realId) {
     return new Promise ((resolve, reject) => {
         (async () => {
             let proxy = await getProxy();
-            request(`http://wenshu.court.gov.cn/CreateContentJS/CreateContentJS.aspx?DocID=${realId}`, {
-                'proxy':"http://" + proxy
-            }, (err, res, body) => {
+            if (!proxy){
+                logger.error("获取代理失败");
+                reject();
+            }
+            let options = {
+                url:`http://wenshu.court.gov.cn/CreateContentJS/CreateContentJS.aspx?DocID=${realId}`,
+                method:"GET",
+                proxy:"http://" + proxy,
+                timeout:10000,
+            }
+            request(options, (err, res, body) => {
                 try {
                     if (err) {
+                        logger.error(err);
                         reject(err);
                     }
                 } catch (e) {
                     logger.warn(e)
-                    // console.warn(e);
                 }
                 resolve(body);
             })
@@ -166,6 +175,10 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
         if (config.proxy.address) {
             (async ()=> {
                 let proxy = await getProxy();
+                if (!proxy){
+                    logger.error("获取代理失败");
+                    reject();
+                }
                 options['proxy'] = "http://" + proxy;
                 let flag = false;
                 let timeWatcher = setTimeout(() => {
@@ -242,7 +255,7 @@ async function main () {
     let result;
     logger.debug(`----------------------------------------> 开始获取列表`);
 
-    for (let i = 1; i < courtsData.length; i ++) {
+    for (let i = 0; i < courtsData.length; i ++) {
         logger.debug("");
         logger.debug(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
         logger.debug(`获取法院数据进度：${i / courtsData.length * 100} %`);
@@ -287,30 +300,73 @@ async function main () {
     //  获取所有的文书列表
     let wenshuList = await Dao.getWenShuList();
     //  暂未测试
-    
-    // for (let i = 0; i < contentList.length; i++) {
-    //     logger.debug(`获取文书数据进度：${i / courtsList.length * 100} %`)
-    //     if (contentList[i].hasOwnProperty('RunEval')) {
-    //         (() => {
-    //             //替换默认setTimeout，因为Node的setTimeout默认不能支持字符串
-    //             setTimeout = function (string) {
-    //                 eval(string);
-    //             }
-    //             eval(unzip(contentList[i]['RunEval']));
-    //         })()
-    //     } else {
-    //         try {
-    //             let realId = Navi(contentList[i]['文书ID']);
-    //         } catch (e) {
-    //             logger.error(`<<为文书 <${contentList[i]['文书ID']}> 解密失败>>`);
-    //         }
-    //         try {
-    //             let doc = await getDoc(realId);
-    //         } catch (e) {
-    //             logger.error(`<<获取文书 <${contentList[i]['文书ID']}> 详情失败>>`);
-    //         }
-    //     }
-    // }
+    wenshuList.forEach(element => {
+        if (element.run_eval) {
+            element.RunEval = element.run_eval;
+        } 
+        element["文书ID"] = element.ID;
+    });
+    contentList = wenshuList;
+
+    for (let i = 16422; i < contentList.length; i++) {
+        logger.debug(`获取文书数据进度：${i}`)
+        if (contentList[i].hasOwnProperty('RunEval')) {
+            (() => {
+                //替换默认setTimeout，因为Node的setTimeout默认不能支持字符串
+                setTimeout = function (string) {
+                    eval(string);
+                }
+                eval(unzip(contentList[i]['RunEval']));
+            })()
+        } else {
+            let realId;
+            try {
+                realId = Navi(contentList[i]['文书ID']);
+            } catch (e) {
+                logger.error(`<<为文书 <${contentList[i]['文书ID']}> 解密失败>>`);
+            }
+            try {
+                // await sleep(200);
+                let doc = await getDoc(realId);
+
+                let docHtml,docSourceText,docDirData,judgeResult;
+
+                // 解析文书HTML
+                try {
+                    logger.debug(doc);
+                    docHtml = Util.getHtmlData(doc);
+                } catch (e) {
+                    logger.error("解析文书HTML失败");
+                }
+
+                // 解析文书原文
+                try {
+                    docSourceText = Util.getSourceText(doc);
+                } catch (e) {
+                    logger.error("解析文书原文失败");
+                }
+
+                // 解析文书相关信息
+                try {
+                    docDirData = Util.getDirData(doc);
+                } catch (e) {
+                    logger.error("解析文书相关信息失败");
+                }
+
+                // 解析文书判决结果
+                try {
+                    judgeResult = Util.getResOfJudge(docSourceText);
+                } catch (e) {
+                    logger.error("解析文书判决结果失败");
+                }
+
+                Dao.insertWenShu(doc);
+            } catch (e) {
+                logger.error(e);
+                logger.error(`<<获取文书 <${contentList[i]['文书ID']}> 详情失败>>`);
+            }
+        }
+    }
 }
 
 try {
