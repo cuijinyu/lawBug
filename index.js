@@ -308,7 +308,7 @@ async function main () {
     });
     contentList = wenshuList;
 
-    for (let i = 16422; i < contentList.length; i++) {
+    for (let i = 0; i < contentList.length; i++) {
         logger.debug(`获取文书数据进度：${i}`)
         if (contentList[i].hasOwnProperty('RunEval')) {
             (() => {
@@ -373,4 +373,18 @@ try {
     main();
 } catch (e) {
     logger.error(e);
+}
+
+module.exports = {
+    sleep,
+    getCookie,
+    getvjkl5,
+    createGuid,
+    get_key,
+    getNumber,
+    getProxy,
+    getDoc,
+    setAllParams,
+    Navi,
+    getTreeList
 }
