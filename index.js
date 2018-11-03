@@ -7,8 +7,8 @@ const config = require('./config/config');
 const getKey = require('./lib/getKey');
 const log4js = require("log4js");
 const Util = require("./util/getInfo");
+const ProxyPool = require("./proxyPool/proxyPool");
 const unzip = De.unzip;
-
 const logger = log4js.getLogger();
 // logger.level = 'debug';
 
@@ -26,20 +26,43 @@ let com = {
     str:De.str
 }
 
+let proxyPool;
+
 let courtsData = fs.readFileSync('./data/courts.txt', 'utf-8'); //  全国法院数组
 courtsData = eval(courtsData);
 
 function getCookie () {
     return new Promise( (resolve, reject) => {
-        request.get("http://wenshu.court.gov.cn/list/list/?sorttype=1", (err, res, body) => {
-            if (err) {
-                logger.error(err);
-                // logger.debug(err);
-                reject(err);
-            }
-            // logger.debug(res.headers["set-cookie"]);
-            resolve(res.headers["set-cookie"]);
-        })  
+        let headers = {
+            "Accept":"*/*",
+            "Accept-Encoding":"gzip, deflate",
+            "Accept-Language":"zh-CN,zh;q=0.8",
+            "Content-Type":"application/x-www-form-urlencoded; charset=UTF-8",
+            "Host":"wenshu.court.gov.cn",
+            "Origin":"http://wenshu.court.gov.cn",
+            "Proxy-Connection":"keep-alive",
+            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36",
+            "X-Requested-With":"XMLHttpRequest"
+        }
+        let options = {
+            url:"http://wenshu.court.gov.cn/list/list/?sorttype=1",
+            method:"GET",
+            headers,
+            timeout:10000
+        }
+        try {
+            request.get(options, (err, res, body) => {
+                if (err) {
+                    logger.error(err);
+                    // logger.debug(err);
+                    reject(err);
+                }
+                // logger.debug(res.headers["set-cookie"]);
+                resolve(res.headers["set-cookie"]);
+            })  
+        } catch (e) {
+            logger.error("获取页面失败")
+        }
     })
 }
 
@@ -88,23 +111,29 @@ function getNumber (guid) {
 }
 
 function getProxy () {
-    let options = {
-        url:`${config.proxy.address}`,
-        method:"GET",
-        timeout:10000,
-    };
-    return new Promise( (resolve, reject) => {
-        //  代理IP
-        request(options, (err, res, body) => {
-            if (err) {
-                logger.error("抱歉！代理服务器似乎挂了");
-                reject(err);
-            }
-            logger.debug(`<!使用IP代理-------->${body}`);
-            // logger.debug(`<!使用IP代理-------->${body}`);
-            resolve(body);
-        })
-    })
+    // let options = {
+    //     url:`${config.proxy.address}`,
+    //     method:"GET",
+    //     timeout:10000,
+    // };
+    // return new Promise( (resolve, reject) => {
+    //     //  代理IP
+    //     request(options, (err, res, body) => {
+    //         if (err) {
+    //             logger.error("抱歉！代理服务器似乎挂了");
+    //             reject(err);
+    //         }
+    //         logger.debug(`<!使用IP代理-------->${body}`);
+    //         // logger.debug(`<!使用IP代理-------->${body}`);
+    //         resolve(body);
+    //     })
+    // })
+    console.log(proxyPool.getProxy())
+    return Promise.resolve(proxyPool.getProxy());
+}
+
+function setProxyPool(pool) {
+    proxyPool = pool;
 }
 
 function getDoc (realId) {
@@ -249,12 +278,34 @@ async function setAllParams () {
     }
 }
 
+async function setAllParams_multi (param) {
+    let cookie = await getCookie();
+    let vjkl5 = getvjkl5(cookie);
+    let guid = getGuid();
+    let number = await getNumber(guid);
+    let vl5x = get_key(vjkl5);
+    logger.debug(`设置Cookie为 -----> ${cookie}`);
+    logger.debug(`设置vjkl5为 -----> ${vjkl5}`);
+    logger.debug(`设置number为 -----> ${number}`);
+    logger.debug(`设置vl5x为 -----> ${vl5x}`);
+    //查询所用的参数
+    logger.debug(`设置查询参数为 -----> ${param}`);
+    return {
+        cookie,
+        vjkl5,
+        guid,
+        number,
+        vl5x,
+        param
+    }
+}
+
 async function main () {
     let contentList = [];
     let searchObj = {};
     let result;
     logger.debug(`----------------------------------------> 开始获取列表`);
-
+    proxyPool = new ProxyPool();
     for (let i = 0; i < courtsData.length; i ++) {
         logger.debug("");
         logger.debug(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
@@ -369,11 +420,40 @@ async function main () {
     }
 }
 
-try {
-    main();
-} catch (e) {
-    logger.error(e);
+async function getOnePageWenShu (param, page) {
+    // 以下为获取一页文书列表
+    searchParamObj = await setAllParams_multi(param);
+    let result = await getTreeList(searchParamObj.guid, 
+                                   searchParamObj.number,
+                                   searchParamObj.param,
+                                   searchParamObj.vl5x,
+                                   page);
+    result = JSON.parse(eval(result));
+    result.forEach(element => {
+        Dao.insertListContent(element);
+    });
+    return result;
 }
+
+async function getOneWenShuDetail (isRunEval, docId) {
+    if (isRunEval) {
+        setTimeout = function (string) {
+            eval(string);
+        }
+        eval(unzip(docId))
+    } else {
+        let realId = Navi(docId);
+        let doc = await getDoc(realId);
+        Dao.insertWenShu(doc);
+        return doc;
+    }
+}
+
+// try {
+//     main();
+// } catch (e) {
+//     logger.error(e);
+// }
 
 module.exports = {
     sleep,
@@ -386,5 +466,7 @@ module.exports = {
     getDoc,
     setAllParams,
     Navi,
-    getTreeList
+    getTreeList,
+    getOnePageWenShu,
+    setProxyPool
 }
