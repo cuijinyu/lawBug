@@ -2,8 +2,15 @@
 
 利用Node.js爬取裁判文书网的数据
 
+多进程爬虫利用redis作为任务队列
+
+本项目仅为学习使用，未大规模尝试爬取
+
 ## 使用方法
+
 首先clone本项目
+
+### 单进程版本配置方法
 
 在config文件夹中的config.js中配置
 
@@ -13,25 +20,41 @@ search.param 为要搜索的参数内容，请按照格式填写
 database 为数据库配置，本项目采用mysql
 ```
 
+### 多进程版本配置方法
+```
+不用在config中配置param，在multi_process.js中配置请求参数队列
 
+其他配置如上
+```
+
+## 单进程运行
 ```
 npm install 
 node index.js
 ```
+
+## 多进程运行
+```
+npm install
+node multi_process.js
+```
+
 ## 项目结构
 
-    config -----配置文件
-    data -----全国法院列表
-    db ------数据库配置
-    util -------数据提取处理配置文件
-        getInfo.js  -------用于从未经处理的文书全文中获取文书正文，相关法律条文和判决结果
-        output.js  --------用于从数据库中提取输出
+    config/ -----配置文件
+    data/ -----全国法院列表
+    db/ ------数据库配置
+    proxyPool/ ------代理池，为了加快代理获取速度
+    util/  ------工具集，包括提取文书信息的工具
     index.js -----项目主文件
+    multi_process.js ------多进程版本主文件
+    son_getDoc.js ------子进程，用于获取文书全文
+    son_getList.js ------子进程，用于获取文书列表
     wenshu.sql ------所需建的表
     cutWord.py --------分词所用的脚本
 
 ## 暂未完成
-    - 未构建代理池
-    - 未使用多进程加速
+    - 完善的日志系统
+    - 错误警报
 
 ## 欢迎大家提出Issue和Pr

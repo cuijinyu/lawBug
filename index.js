@@ -80,7 +80,7 @@ function get_key (vjkl5) {
     return getKey(vjkl5);
 }
 
-function getNumber (guid) {
+function getNumber (guid, proxy) {
     let headers = {
         "Accept":"*/*",
         "Accept-Encoding":"gzip, deflate",
@@ -100,6 +100,9 @@ function getNumber (guid) {
             'guid':guid
         })
     }
+    if (proxy) {
+        options.proxy = "http://" + proxy;
+    }
     return new Promise ((resolve, reject) => {
         request(options, (err, res, body) => {
             if (err) {
@@ -111,38 +114,40 @@ function getNumber (guid) {
 }
 
 function getProxy () {
-    // let options = {
-    //     url:`${config.proxy.address}`,
-    //     method:"GET",
-    //     timeout:10000,
-    // };
-    // return new Promise( (resolve, reject) => {
-    //     //  代理IP
-    //     request(options, (err, res, body) => {
-    //         if (err) {
-    //             logger.error("抱歉！代理服务器似乎挂了");
-    //             reject(err);
-    //         }
-    //         logger.debug(`<!使用IP代理-------->${body}`);
-    //         // logger.debug(`<!使用IP代理-------->${body}`);
-    //         resolve(body);
-    //     })
-    // })
-    console.log(proxyPool.getProxy())
-    return Promise.resolve(proxyPool.getProxy());
+    let options = {
+        url:`${config.proxy.address}`,
+        method:"GET",
+        timeout:10000,
+    };
+    return new Promise( (resolve, reject) => {
+        //  代理IP
+        request(options, (err, res, body) => {
+            if (err) {
+                logger.error("抱歉！代理服务器似乎挂了");
+                reject(err);
+            }
+            logger.debug(`<!使用IP代理-------->${body}`);
+            // logger.debug(`<!使用IP代理-------->${body}`);
+            resolve(body);
+        })
+    })
+    // console.log(proxyPool.getProxy())
+    // return Promise.resolve(proxyPool.getProxy());
 }
 
 function setProxyPool(pool) {
     proxyPool = pool;
 }
 
-function getDoc (realId) {
+function getDoc (realId, proxy) {
     return new Promise ((resolve, reject) => {
         (async () => {
-            let proxy = await getProxy();
-            if (!proxy){
-                logger.error("获取代理失败");
-                reject();
+            if (!proxy) {
+                proxy = await getProxy();
+                if (!proxy){
+                    logger.error("获取代理失败");
+                    reject();
+                }
             }
             let options = {
                 url:`http://wenshu.court.gov.cn/CreateContentJS/CreateContentJS.aspx?DocID=${realId}`,
@@ -169,7 +174,7 @@ function getGuid () {
     return createGuid() + createGuid() + '-' + createGuid() + '-' + createGuid() + createGuid() + '-' + createGuid() + createGuid() + createGuid();
 }
 
-async function getTreeList (guid, number, param, vl5x, index = 1) {
+async function getTreeList (guid, number, param, vl5x, index = 1, proxy) {
     logger.debug(arguments);
     return new Promise ((resolve, reject) => {
         let headers = {
@@ -203,10 +208,12 @@ async function getTreeList (guid, number, param, vl5x, index = 1) {
         }
         if (config.proxy.address) {
             (async ()=> {
-                let proxy = await getProxy();
-                if (!proxy){
-                    logger.error("获取代理失败");
-                    reject();
+                if (!proxy) {
+                    proxy = await getProxy();
+                    if (!proxy){
+                        logger.error("获取代理失败");
+                        reject();
+                    }
                 }
                 options['proxy'] = "http://" + proxy;
                 let flag = false;
@@ -278,11 +285,11 @@ async function setAllParams () {
     }
 }
 
-async function setAllParams_multi (param) {
+async function setAllParams_multi (param, proxy) {
     let cookie = await getCookie();
     let vjkl5 = getvjkl5(cookie);
     let guid = getGuid();
-    let number = await getNumber(guid);
+    let number = await getNumber(guid, proxy);
     let vl5x = get_key(vjkl5);
     logger.debug(`设置Cookie为 -----> ${cookie}`);
     logger.debug(`设置vjkl5为 -----> ${vjkl5}`);
@@ -420,14 +427,16 @@ async function main () {
     }
 }
 
-async function getOnePageWenShu (param, page) {
+async function getOnePageWenShu (param, page, proxy) {
     // 以下为获取一页文书列表
-    searchParamObj = await setAllParams_multi(param);
+    console.log(param, page, proxy);
+    searchParamObj = await setAllParams_multi(param, proxy);
     let result = await getTreeList(searchParamObj.guid, 
                                    searchParamObj.number,
                                    searchParamObj.param,
                                    searchParamObj.vl5x,
-                                   page);
+                                   page,
+                                   proxy);
     result = JSON.parse(eval(result));
     result.forEach(element => {
         Dao.insertListContent(element);
@@ -448,6 +457,8 @@ async function getOneWenShuDetail (isRunEval, docId) {
         return doc;
     }
 }
+
+// 若要单进程运行，请取消如下注释
 
 // try {
 //     main();
