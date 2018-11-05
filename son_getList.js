@@ -3,12 +3,12 @@ const redisDao = require("./db/redisDao");
 const log4js = require("log4js");
 const logger = log4js.getLogger();
 
-console.log("获取列表进程启动");
+logger.info("获取列表进程启动");
 (async () => {
-    // 进程阻塞，保证一直可以运行
-    while (true) {
+    // 每3秒进行一次检查并且执行
+    setInterval(async () => {
         let size = await redisDao.getListTargetLength();
-        logger.error(`剩余大小---->${size}`);
+        logger.error(`列表队列剩余大小---->${size}`);
         if (size) {
             let proxySize = await redisDao.getListProxyLength()
             if (proxySize) {
@@ -18,11 +18,13 @@ console.log("获取列表进程启动");
                 try{
                     target = JSON.parse(target);
                     let result = await spider.getOnePageWenShu(target.param, target.page);
-                    console.log(result);
+                    if (result) {
+                        await redisDao.pushListDetail(result);
+                    }
                 } catch (e) {
                     await redisDao.pushListTarget(target);
                 }
             }
         }
-    }
+    }, 3000);
 })();

@@ -132,5 +132,17 @@ module.exports = {
                 resolve(res);
             })
         })
+    },
+
+    flushAll () {
+        return new Promise((resolve, reject) => {
+            client.flushall((err, res) => {
+                if (err) {
+                    console.log(err);
+                    reject(err);
+                }
+                resolve(res);
+            });
+        })
     }
 }

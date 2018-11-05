@@ -37,19 +37,19 @@ const Query = ( sql , ...params )=>{
  * @param {*} ListContent 文书列表内容
  */
 async function insertListContent(ListContent) {
-  logger.debug("正在插入列表内容");
-  logger.debug("插入的内容是！！");
-  logger.debug([ListContent['裁判要旨原文'],
-  ListContent['不公开理由'],
-  ListContent['案件类型'],
-  ListContent['裁判日期'],
-  ListContent['案件名称'],
-  ListContent['文书ID'],
-  ListContent['审判程序'],
-  ListContent['案号'],
-  ListContent['法院名称'],
-  ListContent['RunEval']
- ]);
+//   logger.debug("正在插入列表内容");
+//   logger.debug("插入的内容是！！");
+//   logger.debug([ListContent['裁判要旨原文'],
+//   ListContent['不公开理由'],
+//   ListContent['案件类型'],
+//   ListContent['裁判日期'],
+//   ListContent['案件名称'],
+//   ListContent['文书ID'],
+//   ListContent['审判程序'],
+//   ListContent['案号'],
+//   ListContent['法院名称'],
+//   ListContent['RunEval']
+//  ]);
   Object.keys(ListContent).forEach(key => {
     if (!ListContent[key]) {
       ListContent[key] = ""
@@ -75,6 +75,7 @@ async function insertListContent(ListContent) {
  */
 async function insertWenShu(wenshu) {
   logger.debug("正在插入文书内容");
+  logger.info(wenshu);
   return await Query('insert into WenshuData values(?)', wenshu);
 }
 

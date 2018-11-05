@@ -9,6 +9,7 @@ const log4js = require("log4js");
 const Util = require("./util/getInfo");
 const ProxyPool = require("./proxyPool/proxyPool");
 const unzip = De.unzip;
+const redisDao = require("./db/redisDao");
 const logger = log4js.getLogger();
 // logger.level = 'debug';
 
@@ -58,7 +59,12 @@ function getCookie () {
                     reject(err);
                 }
                 // logger.debug(res.headers["set-cookie"]);
-                resolve(res.headers["set-cookie"]);
+                try {
+                    resolve(res.headers["set-cookie"]);
+                } catch (e) {
+                    logger.error(e);
+                    reject("获取cookie失败");
+                }
             })  
         } catch (e) {
             logger.error("获取页面失败")
@@ -313,45 +319,45 @@ async function main () {
     let result;
     logger.debug(`----------------------------------------> 开始获取列表`);
     proxyPool = new ProxyPool();
-    for (let i = 0; i < courtsData.length; i ++) {
-        logger.debug("");
-        logger.debug(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
-        logger.debug(`获取法院数据进度：${i / courtsData.length * 100} %`);
-        logger.debug(`正在查询的法院:所有的法院${i}/${courtsData.length}`);
-        logger.debug("");
-        try{
-            searchObj = await setAllParams();
-            searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
-            result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
-            result = JSON.parse(eval(result));
-            result.forEach(element => {
-                Dao.insertListContent(element);
-            });
-            //如果获取时出现remind key则重新获取cookie
-            while (result === '"remind key"') {
-                logger.debug(`<<出现remind key>>`);
-                searchObj = await setAllParams();
-                searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
-                result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
-                result = JSON.parse(eval(result));
-                result.forEach(element => {
-                    Dao.insertListContent(element);
-                });
-            }
-        } catch(e) {
-            result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
-            //如果获取时出现remind key则重新获取cookie
-            while (result === '"remind key"') {
-                searchObj = await setAllParams();
-                searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
-                result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
-                result = JSON.parse(eval(result));
-                result.forEach(element => {
-                    Dao.insertListContent(element);
-                });
-            }
-        }
-    }
+    // for (let i = 0; i < courtsData.length; i ++) {
+    //     logger.debug("");
+    //     logger.debug(`<<正在查询 <${courtsData[i]}> 法院的数据>>`);
+    //     logger.debug(`获取法院数据进度：${i / courtsData.length * 100} %`);
+    //     logger.debug(`正在查询的法院:所有的法院${i}/${courtsData.length}`);
+    //     logger.debug("");
+    //     try{
+    //         searchObj = await setAllParams();
+    //         searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
+    //         result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
+    //         result = JSON.parse(eval(result));
+    //         result.forEach(element => {
+    //             Dao.insertListContent(element);
+    //         });
+    //         //如果获取时出现remind key则重新获取cookie
+    //         while (result === '"remind key"') {
+    //             logger.debug(`<<出现remind key>>`);
+    //             searchObj = await setAllParams();
+    //             searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
+    //             result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
+    //             result = JSON.parse(eval(result));
+    //             result.forEach(element => {
+    //                 Dao.insertListContent(element);
+    //             });
+    //         }
+    //     } catch(e) {
+    //         result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
+    //         //如果获取时出现remind key则重新获取cookie
+    //         while (result === '"remind key"') {
+    //             searchObj = await setAllParams();
+    //             searchObj.param = searchObj.param + `,基层法院:${courtsData[i]}`;
+    //             result = await getTreeList(searchObj.guid, searchObj.number, searchObj.param, searchObj.vl5x);
+    //             result = JSON.parse(eval(result));
+    //             result.forEach(element => {
+    //                 Dao.insertListContent(element);
+    //             });
+    //         }
+    //     }
+    // }
 
     logger.debug(`----------------------------------------> 开始获取文章内容`);
 
@@ -438,21 +444,25 @@ async function getOnePageWenShu (param, page, proxy) {
                                    page,
                                    proxy);
     result = JSON.parse(eval(result));
+    await redisDao.pushListDetail(result);
     result.forEach(element => {
         Dao.insertListContent(element);
     });
     return result;
 }
 
-async function getOneWenShuDetail (isRunEval, docId) {
+async function getOneWenShuDetail (isRunEval, docId, proxy) {
     if (isRunEval) {
         setTimeout = function (string) {
             eval(string);
         }
         eval(unzip(docId))
+        console.log("执行编译");
+        console.log(com.str._IV);
     } else {
         let realId = Navi(docId);
-        let doc = await getDoc(realId);
+        let doc = await getDoc(realId, proxy);
+        console.log(doc);
         Dao.insertWenShu(doc);
         return doc;
     }
@@ -479,5 +489,6 @@ module.exports = {
     Navi,
     getTreeList,
     getOnePageWenShu,
+    getOneWenShuDetail,
     setProxyPool
 }
