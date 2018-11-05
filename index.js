@@ -214,12 +214,15 @@ async function getTreeList (guid, number, param, vl5x, index = 1, proxy) {
         }
         if (config.proxy.address) {
             (async ()=> {
+                logger.error(proxy);
                 if (!proxy) {
                     proxy = await getProxy();
                     if (!proxy){
                         logger.error("获取代理失败");
                         reject();
                     }
+                } else {
+                    logger.error("正在使用外部IP代理");
                 }
                 options['proxy'] = "http://" + proxy;
                 let flag = false;
@@ -462,8 +465,14 @@ async function getOneWenShuDetail (isRunEval, docId, proxy) {
     } else {
         let realId = Navi(docId);
         let doc = await getDoc(realId, proxy);
-        console.log(doc);
-        Dao.insertWenShu(doc);
+        let test = /审判程序/;
+        if (doc.match(test)){
+            Dao.insertWenShu(doc);
+        } else {
+            // 若失败，则尝试递归获取
+            // logger.error("正在尝试递归获取");
+            // await getOneWenShuDetail(isRunEval, docId, proxy);
+        }
         return doc;
     }
 }

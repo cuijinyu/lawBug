@@ -86,6 +86,21 @@ module.exports = {
         })
     },
 
+    /**
+     * 清空代理队列，用来维护高效有用的代理
+     */
+    flushProxy () {
+        return new Promise((resolve, reject) => {
+            client.ltrim("proxy", 1, 0, (err, res) => {
+                if (err) {
+                    console.log(err);
+                    reject(err);
+                }
+                resolve(res);
+            })
+        })
+    },
+
     pushListDetail (jsonData) {
         return new Promise((resolve, reject) => {
             client.rpush("detail", JSON.stringify(jsonData),(err, res) => {

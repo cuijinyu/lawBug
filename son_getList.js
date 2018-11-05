@@ -17,7 +17,7 @@ logger.info("获取列表进程启动");
                 await redisDao.pushListProxy(proxy);
                 try{
                     target = JSON.parse(target);
-                    let result = await spider.getOnePageWenShu(target.param, target.page);
+                    let result = await spider.getOnePageWenShu(target.param, target.page, proxy);
                     if (result) {
                         await redisDao.pushListDetail(result);
                     }

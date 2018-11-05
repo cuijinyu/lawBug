@@ -18,14 +18,10 @@ logger.info("获取全文进程启动");
                 try{
                     target = JSON.parse(target);
                     target.forEach(async element => {
-                        console.log(`------`);
-                        console.log(element);
-                        console.log(`------`);
                         if (element['RunEval']) {
                             await spider.getOneWenShuDetail(true, element['RunEval'], proxy);
                         } else {
                             let result = await spider.getOneWenShuDetail(false, element['文书ID'], proxy);
-                            console.log(result);
                         } 
                     });
                 } catch (e) {

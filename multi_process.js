@@ -35,7 +35,7 @@ let proxyPool;
     // 15s后执行，给代理池一个构建的时间
     setTimeout(function() {
       let child_process_array = [];
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < 3; i++) {
         child_process_array[i] = child_process.fork("./son_getList.js");
         child_process_array[i].on('close', code => {
           logger.error("获取列表进程意外退出，错误代码%s", code);

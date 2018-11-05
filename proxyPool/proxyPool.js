@@ -44,8 +44,8 @@ class ProxyPool {
 
     // 定时维护代理池
     maintain () {
-        // 每1秒钟获取一个新的代理
-        schedule.scheduleJob("*/1  *  *  *  *  *", async () => {
+        // 每5秒钟获取一个新的代理
+        schedule.scheduleJob("*/5  *  *  *  *  *", async () => {
             try {
                 let proxy = await getProxy();
                 let flag = true;
@@ -64,14 +64,16 @@ class ProxyPool {
             }
         })
         // 每半小时清空一回代理池
-        // schedule.scheduleJob("*  */30  *  *  *  *", async () => {
-        //     try {
-        //         let proxy = this.proxies.shift();
-        //         this.proxies = [proxy];
-        //     } catch(e) {
-                
-        //     }
-        // })
+        schedule.scheduleJob("*  */30  *  *  *  *", async () => {
+            try {
+                let proxy = this.proxies.shift();
+                await redisDao.flushProxy();
+                this.proxies = [proxy];
+                await redisDao.unshiftListProxy(proxy);
+            } catch(e) {
+                logger.error(e);
+            }
+        })
     }
 }
 
