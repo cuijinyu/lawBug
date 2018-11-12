@@ -483,7 +483,7 @@ async function getOneWenShuDetail (isRunEval, docId, proxy) {
 //     main();
 // } catch (e) {
 //     logger.error(e);
-// }
+//}
 
 module.exports = {
     sleep,
