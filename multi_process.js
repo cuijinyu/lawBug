@@ -59,10 +59,6 @@ function readProvinces(txt) {
   
   // 文书详情队列
   let detailTargets = [];
-
-  // 清空原始redis任务队列
-  await redisDao.flushAll();
-  logger.info("清空原始redis队列成功");
   
   try {
     // 初始化任务队列
@@ -93,6 +89,11 @@ function readProvinces(txt) {
       //   logger.error("获取全文进程意外退出，错误代码%s", code);
       // })
     }, 15000);
+
+    // 每一个小时保存一次redis状态，用于持久化，防止意外关闭时不能再次继续上次的状态
+    setTimeout(async() => {
+      await redisDao.saveRedis();
+    }, 60*60*1000);
 
   } catch (e) {
     logger.error(e);

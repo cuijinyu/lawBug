@@ -5,6 +5,13 @@
 多进程爬虫利用redis作为任务队列
 
 本项目仅为学习使用，未大规模尝试爬取
+## 外部依赖
+
+node > v8.0
+
+mysql
+
+redis
 
 ## 使用方法
 
@@ -22,21 +29,29 @@ database 为数据库配置，本项目采用mysql
 
 ### 多进程版本配置方法
 ```
-不用在config中配置param，在multi_process.js中配置请求参数队列
+不用在config中配置param，在multi_process.js中配置请求参数队列,params数组即为参数队列
 
 其他配置如上
 ```
 
-## 单进程运行
+## 安装依赖
 ```
 npm install 
-node index.js
+```
+
+## 单进程运行
+```
+npm start
 ```
 
 ## 多进程运行
 ```
-npm install
-node multi_process.js
+npm run multi
+```
+
+## 清空redis状态 ( 一般用于重新开始任务队列 )
+```
+npm run clean
 ```
 
 ## 项目结构

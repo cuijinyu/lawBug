@@ -1,7 +1,6 @@
 const redis = require("redis");
 const client = redis.createClient(6379, '127.0.0.1');
-
-module.exports = {
+const operations = {
     pushListTarget (jsonData) {
         return new Promise((resolve, reject) => {
             client.rpush("target", JSON.stringify(jsonData),(err, res) => {
@@ -161,3 +160,4 @@ module.exports = {
         })
     }
 }
+module.exports = operations;
