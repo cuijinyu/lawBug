@@ -1,6 +1,7 @@
 const child_process = require("child_process");
 const fs = require("fs");
 const spider = require("./index.js");
+const Dao = require('./db/dao');
 const redisDao = require("./db/redisDao");
 const numCPUs = require('os').cpus().length;
 const ProxyPool = require("./proxyPool/proxyPool");
@@ -75,19 +76,31 @@ function readProvinces(txt) {
     spider.setProxyPool(proxyPool);
     logger.info("代理池构建完毕");
 
+    //  获取所有的文书列表
+    let wenshuList = await Dao.getWenShuList();
+    wenshuList.forEach(async element => {
+      if (element.run_eval) {
+          element.RunEval = element.run_eval;
+      } 
+      element["文书ID"] = element.ID;
+      // console.log(JSON.stringify(element));
+      await redisDao.pushListDetail(element);
+    });
+    logger.debug(`文书列表总任务长度为:${await redisDao.getListDetailLength()}`)
+
     // 15s后执行，给代理池一个构建的时间
     setTimeout(function() {
       let child_process_array = [];
-      for (let i = 0; i < 4; i++) {
-        child_process_array[i] = child_process.fork("./son_getList.js");
-        child_process_array[i].on('close', code => {
-          logger.error("获取列表进程意外退出，错误代码%s", code);
-        })
-      }
-      // child_getDoc = child_process.fork("./son_getDoc.js");
-      // child_getDoc.on('close', code => {
-      //   logger.error("获取全文进程意外退出，错误代码%s", code);
-      // })
+      // for (let i = 0; i < 4; i++) {
+      //   child_process_array[i] = child_process.fork("./son_getList.js");
+      //   child_process_array[i].on('close', code => {
+      //     logger.error("获取列表进程意外退出，错误代码%s", code);
+      //   })
+      // }
+      child_getDoc = child_process.fork("./son_getDoc.js");
+      child_getDoc.on('close', code => {
+        logger.error("获取全文进程意外退出，错误代码%s", code);
+      })
     }, 15000);
 
     // 每一个小时保存一次redis状态，用于持久化，防止意外关闭时不能再次继续上次的状态

@@ -112,6 +112,20 @@ const operations = {
         })
     },
 
+    unshiftListDetail (jsonData) {
+        return new Promise((resolve, reject) => {
+            client.lpush("detail", JSON.stringify(jsonData),(err, res) => {
+                if (err) {
+                    console.log(err);
+                    reject(err);
+                }
+                resolve(res);
+            })
+        })
+    },
+    // shiftListDetail () {
+
+    // },
     popListDetail () {
         return new Promise((resolve, reject) => {
             client.lpop("detail", (err, res) => {

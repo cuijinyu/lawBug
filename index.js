@@ -438,42 +438,52 @@ async function main () {
 
 async function getOnePageWenShu (param, page, proxy) {
     // 以下为获取一页文书列表
-    console.log(param, page, proxy);
-    searchParamObj = await setAllParams_multi(param, proxy);
-    let result = await getTreeList(searchParamObj.guid, 
-                                   searchParamObj.number,
-                                   searchParamObj.param,
-                                   searchParamObj.vl5x,
-                                   page,
-                                   proxy);
-    result = JSON.parse(eval(result));
-    await redisDao.pushListDetail(result);
-    result.forEach(element => {
-        Dao.insertListContent(element);
-    });
+        console.log(param, page, proxy);
+        searchParamObj = await setAllParams_multi(param, proxy);
+        let result = await getTreeList(searchParamObj.guid, 
+                                       searchParamObj.number,
+                                       searchParamObj.param,
+                                       searchParamObj.vl5x,
+                                       page,
+                                       proxy);
+        result = JSON.parse(eval(result));
+        await redisDao.pushListDetail(result);
+        result.forEach(element => {
+            Dao.insertListContent(element);
+        });
     return result;
 }
 
-async function getOneWenShuDetail (isRunEval, docId, proxy) {
-    if (isRunEval) {
-        setTimeout = function (string) {
-            eval(string);
-        }
-        eval(unzip(docId))
-        console.log("执行编译");
-        console.log(com.str._IV);
-    } else {
-        let realId = Navi(docId);
-        let doc = await getDoc(realId, proxy);
-        let test = /审判程序/;
-        if (doc.match(test)){
-            Dao.insertWenShu(doc);
+async function getOneWenShuDetail (isRunEval, docId, proxy, RunEval) {
+    try { 
+        if (isRunEval) {
+            setTimeout = function (string) {
+                eval(string);
+            }
+            eval(unzip(docId))
+            console.log("执行编译");
+            console.log(com.str._IV);
         } else {
-            // 若失败，则尝试递归获取
-            // logger.error("正在尝试递归获取");
-            // await getOneWenShuDetail(isRunEval, docId, proxy);
+            let realId = Navi(docId);
+            let doc = await getDoc(realId, proxy);
+            let test = /审判程序/;
+            if (doc.match(test)){
+                Dao.insertWenShu(doc);
+            } else {
+                throw('getError');
+                // 若失败，则尝试递归获取
+                // logger.error("正在尝试递归获取");
+                // await getOneWenShuDetail(isRunEval, docId, proxy);
+            }
+            return doc;
         }
-        return doc;
+    } catch (e) {
+        throw({
+            target:{
+                '文书ID':docId,
+                RunEval
+            }
+        })
     }
 }
 
@@ -483,7 +493,7 @@ async function getOneWenShuDetail (isRunEval, docId, proxy) {
 //     main();
 // } catch (e) {
 //     logger.error(e);
-//}
+// }
 
 module.exports = {
     sleep,

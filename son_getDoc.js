@@ -5,6 +5,8 @@ const logger = log4js.getLogger();
 
 logger.info("获取全文进程启动");
 (async () => {
+    let RunEval;
+    let target;
     // 每3秒进行一次检测，有则执行
     setInterval(async () => {
         let size = await redisDao.getListDetailLength();
@@ -12,23 +14,35 @@ logger.info("获取全文进程启动");
         if (size) {
             let proxySize = await redisDao.getListProxyLength()
             if (proxySize) {
-                let target = await redisDao.popListDetail();
+                target = await redisDao.popListDetail();
                 let proxy = await redisDao.popListProxy();
                 await redisDao.pushListProxy(proxy);
                 try{
+                    console.log(target)
                     target = JSON.parse(target);
-                    target.forEach(async element => {
+                    let element = target;
+                    
+                    // target.forEach(async element => {
                         if (element['RunEval']) {
+                            RunEval = element;
+                            console.log(RunEval)
                             await spider.getOneWenShuDetail(true, element['RunEval'], proxy);
                         } else {
-                            let result = await spider.getOneWenShuDetail(false, element['文书ID'], proxy);
+                            let result = await spider.getOneWenShuDetail(false, element['文书ID'], proxy, RunEval);
                         } 
-                    });
+                    // });
                 } catch (e) {
-                    console.log(e);
-                    await redisDao.pushListDetail(target);
+                    // console.log(e);
+                    // console.log(target)
+                    // console.log(RunEval)
+                    if (!target || target == 'undefined') {
+                        return;
+                    }
+                    await redisDao.unshiftListDetail(target);
+                    await redisDao.unshiftListDetail(RunEval);
+                    // await redisDao.pushListDetail(target);
                 }
             }
         }
-    }, 5000);
+    }, 1000);
 })();
