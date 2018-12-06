@@ -38,11 +38,11 @@ logger.info("获取全文进程启动");
                     if (!target || target == 'undefined') {
                         return;
                     }
-                    await redisDao.unshiftListDetail(target);
-                    await redisDao.unshiftListDetail(RunEval);
+                    await redisDao.pushListDetail(RunEval);
+                    await redisDao.pushListDetail(target);
                     // await redisDao.pushListDetail(target);
                 }
             }
         }
-    }, 1000);
+    }, 100);
 })();
